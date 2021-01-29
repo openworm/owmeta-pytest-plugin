@@ -45,7 +45,7 @@ setup(
     url='https://github.com/openworm/owmeta-pytest-plugin/',
     entry_points={
         'pytest11': [
-            'owmeta_core_fixtures = owmeta_core.test_fixtures'
+            'owmeta_core_fixtures = owmeta_pytest_plugin'
         ]
     },
     classifiers=[
