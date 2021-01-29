@@ -30,7 +30,7 @@ def excludes(base):
 setup(
     name='owmeta-pytest-plugin',
     zip_safe=False,
-    install_require=[
+    install_requires=[
         'pytest>=3.4.0',
         'owmeta-core',
     ],
