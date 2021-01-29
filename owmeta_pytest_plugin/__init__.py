@@ -1,7 +1,7 @@
 from collections import namedtuple
 import shutil
 
-from owmeta_core.bundle import (find_bundle_directory, AccessorConfig, Remote)
+from owmeta_core.bundle import find_bundle_directory, AccessorConfig, Remote
 from owmeta_core.bundle.loaders import Loader
 from pytest import fixture
 
