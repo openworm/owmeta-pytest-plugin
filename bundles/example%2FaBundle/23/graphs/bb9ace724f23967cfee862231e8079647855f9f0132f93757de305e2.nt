@@ -1,0 +1,4 @@
+<http://example.org/A> <http://openworm.org/entities/A/blueness> "24"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<http://example.org/A> <http://openworm.org/entities/A/redness> "24"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<http://example.org/A> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://openworm.org/entities/A> .
+
