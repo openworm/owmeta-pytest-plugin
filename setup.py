@@ -31,6 +31,7 @@ setup(
     name='owmeta-pytest-plugin',
     zip_safe=False,
     install_requires=[
+        'pytest',
         'owmeta-core',
     ],
     version=version,

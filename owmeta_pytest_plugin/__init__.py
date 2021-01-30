@@ -11,6 +11,7 @@ import os
 from owmeta_core.command import DEFAULT_OWM_DIR, OWM
 from owmeta_core.bundle import find_bundle_directory, AccessorConfig, Remote, Fetcher
 from owmeta_core.bundle.loaders import Loader
+from pkg_resources import resource_stream
 from pytest import fixture, mark
 
 
@@ -179,7 +180,7 @@ def owm_project(request):
 
 def _owm_project_helper(request):
     def f(*args, **kwargs):
-        res = _shell_helper(*args, **kwargs)
+        res = _shell_helper(request, *args, **kwargs)
         try:
             default_context_id = 'http://example.org/data'
             res.sh(f'owm -b init --default-context-id "{default_context_id}"')
@@ -194,7 +195,7 @@ def _owm_project_helper(request):
             def fetch(bundle_data):
                 bundles_directory = p(res.test_homedir, '.owmeta', 'bundles')
                 fetcher = Fetcher(bundles_directory, (bundle_data.remote,))
-                fetcher.fetch(bundle_data.id, bundle_data.version)
+                return fetcher.fetch(bundle_data.id, bundle_data.version)
 
             res.owm = owm
             res.fetch = fetch
@@ -206,12 +207,12 @@ def _owm_project_helper(request):
 
 
 @fixture
-def shell_helper():
+def shell_helper(request):
     '''
     Helper for running shell commands from a temporary working directory and home
     directory. Returns a `.Data` instance.
     '''
-    res = _shell_helper()
+    res = _shell_helper(request)
     try:
         yield res
     finally:
@@ -219,7 +220,7 @@ def shell_helper():
 
 
 @fixture
-def shell_helper_with_customizations():
+def shell_helper_with_customizations(request):
     '''
     Like `shell_helper`, but returns a context manager instead which accepts a
     `customizations` argument, a string that will be written as the contents of
@@ -227,7 +228,7 @@ def shell_helper_with_customizations():
     '''
     @contextmanager
     def f(*args, **kwargs):
-        res = _shell_helper(*args, **kwargs)
+        res = _shell_helper(request, *args, **kwargs)
         try:
             yield res
         finally:
@@ -235,15 +236,20 @@ def shell_helper_with_customizations():
     return f
 
 
-def _shell_helper(customizations=None):
+def _shell_helper(request, customizations=None):
     res = Data()
     os.mkdir(res.test_homedir)
-    with open(p('tests', 'pytest-cov-embed.py'), 'r') as f:
-        ptcov = f.read()
-    # Added so pytest_cov gets to run for our subprocesses
-    with open(p(res.testdir, 'sitecustomize.py'), 'w') as f:
-        f.write(ptcov)
-        f.write('\n')
+
+    # Am I *supposed* to use _cov to detect pytest-cov installation? Maybe... maybe
+    # not....
+    pm = request.config.pluginmanager
+    if pm.hasplugin('_cov'):
+        with resource_stream('owmeta_pytest_plugin', 'pytest-cov-embed.py') as f:
+            ptcov = f.read()
+        # Added so pytest_cov gets to run for our subprocesses
+        with open(p(res.testdir, 'sitecustomize.py'), 'wb') as f:
+            f.write(ptcov)
+            f.write(b'\n')
 
     def apply_customizations():
         if customizations:
