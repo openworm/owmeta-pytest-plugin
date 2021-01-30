@@ -3,10 +3,9 @@ import shutil
 
 from owmeta_core.bundle import find_bundle_directory, AccessorConfig, Remote
 from owmeta_core.bundle.loaders import Loader
-from pytest import fixture
 
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 BundleData = namedtuple('BundleData', ('id', 'version', 'source_directory', 'remote'))
 
@@ -59,10 +58,7 @@ def bundle_fixture_helper(bundle_id):
     return bundle
 
 
-core_bundle = fixture(bundle_fixture_helper('openworm/owmeta-core'))
-
-
 def pytest_configure(config):
-    config.addinivalue_line("markers",
-            "bundle_version(bundle_id, bundle_version): Marks for telling bundle fixtures"
-            " their version number")
+    config.addinivalue_line('markers',
+            'bundle_version(bundle_id, bundle_version): Marks for telling bundle fixtures'
+            ' their version number')
