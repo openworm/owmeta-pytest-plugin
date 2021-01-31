@@ -15,7 +15,7 @@ from pkg_resources import resource_stream
 from pytest import fixture, mark
 
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 BundleData = namedtuple('BundleData', ('id', 'version', 'source_directory', 'remote'))
 TEST_BUNDLES_DIRECTORY = os.environ.get('TEST_BUNDLES_DIRECTORY', 'bundles')
