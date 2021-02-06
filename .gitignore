@@ -1,0 +1,5 @@
+docs/api
+build
+dist
+env
+htmlcov
