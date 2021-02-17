@@ -32,7 +32,7 @@ setup(
     zip_safe=False,
     install_requires=[
         'pytest',
-        'owmeta-core',
+        'owmeta-core>=0.14.0.dev0',
     ],
     version=version,
     packages=['owmeta_pytest_plugin'],

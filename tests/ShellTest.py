@@ -65,6 +65,21 @@ def test_remote_bundle(pytester):
     pytester.runpytest().assert_outcomes(passed=1)
 
 
+def test_remote_bundle_by_name(pytester):
+    # Set up a remote
+    pytester.run('owm', 'bundle', 'remote', 'add', 'test',
+            f'file://{pytester.path}/remote-bundles')
+
+    # Set up the test that will be run
+    pytester.copy_example('bundle_remote_by_name_test.py')
+
+    # Copy the bundle(s) we use in the test
+    shutil.copytree(Path(CWD, 'bundles'), Path(pytester.path, 'remote-bundles'))
+
+    # Run the test, asserting that one test passes and none fail (implicit)
+    pytester.runpytest().assert_outcomes(passed=1)
+
+
 def test_writefile_file(shell_helper):
     shell_helper.writefile('setup.py')
 

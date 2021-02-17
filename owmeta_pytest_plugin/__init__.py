@@ -8,8 +8,10 @@ import shutil
 import shlex
 import os
 
-from owmeta_core.command import DEFAULT_OWM_DIR, OWM
-from owmeta_core.bundle import find_bundle_directory, AccessorConfig, Remote, Fetcher
+from owmeta_core.command import OWM
+from owmeta_core.command_util import DEFAULT_OWM_DIR
+from owmeta_core.bundle import (find_bundle_directory, AccessorConfig, Remote, Fetcher,
+                                retrieve_remote_by_name)
 from owmeta_core.bundle.exceptions import BundleNotFound
 from owmeta_core.bundle.loaders import Loader
 from pkg_resources import resource_stream
@@ -24,27 +26,9 @@ TEST_BUNDLES_DIRECTORY = os.environ.get('TEST_BUNDLES_DIRECTORY', 'bundles')
 
 def bundle_fixture_helper(bundle_id, version=None):
     '''
-    Creates test fixtures for testing with pre-made bundles. These may be for testing
-    against older versions of bundles maintained within the project or for creating a
-    "test fake" of a bundle dependency to test integration short of fetching the full
-    dependency.
+    Creates test fixtures for testing with pre-made bundles.
 
-    The source directory for the bundles follows exactly the same structure as the bundle
-    cache directory in :file:`~/.owmeta/bundles`. The location for the directory comes
-    from the :envvar:`TEST_BUNDLES_DIRECTORY` environment variable and defaults to
-    :file:`bundles` in the current working directory if that variable is unset.
-
-    If `version` is omitted, then the version numbers will come from parameters, typically
-    provided by :ref:`pytest.mark.paremetrize<parametrizemark>`. `bundles` and
-    `bundle_versions` help with this.
-
-    For example::
-
-        my_bundle = pytest.fixture(bundle_fixture_helper('example/my_bundle'))
-
-        @bundle_versions('my_bundle', list(range(1, 5)))
-        def test_my_bundle(my_bundle):
-            # do something with my_bundle
+    See :ref:`usage` in the docs for details.
 
     Parameters
     ----------
@@ -81,8 +65,13 @@ def bundle_fixture_helper(bundle_id, version=None):
             test_bundles_remote = marker.args[0] if marker else None
             if not test_bundles_remote:
                 raise
-            with open(test_bundles_remote) as inp:
-                remote = Remote.read(inp)
+            try:
+                with open(test_bundles_remote) as inp:
+                    remote = Remote.read(inp)
+            except FileNotFoundError:
+                remote = retrieve_remote_by_name(p(DEFAULT_OWM_DIR, 'remotes'), test_bundles_remote)
+                if remote is None:
+                    raise
             source_directory = None
         else:
             class TestAC(AccessorConfig):
@@ -126,14 +115,6 @@ def bundle_fixture_helper(bundle_id, version=None):
 bundle = fixture(bundle_fixture_helper(None))
 '''
 A fixture for bundles.
-
-Example usage::
-
-    @bundles([('example/aBundle', 1),
-              ('_orphans/aBundle', 2),
-              ('phoenix/aBundle', 3),])
-    def test_bundle_with_renames(bundle):
-        # do something with versions of aBundle
 '''
 
 
