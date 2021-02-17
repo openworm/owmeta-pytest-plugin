@@ -10,6 +10,7 @@ import os
 
 from owmeta_core.command import DEFAULT_OWM_DIR, OWM
 from owmeta_core.bundle import find_bundle_directory, AccessorConfig, Remote, Fetcher
+from owmeta_core.bundle.exceptions import BundleNotFound
 from owmeta_core.bundle.loaders import Loader
 from pkg_resources import resource_stream
 from pytest import fixture, mark
@@ -72,41 +73,53 @@ def bundle_fixture_helper(bundle_id, version=None):
             except AttributeError as e:
                 raise Exception('Use the bundle_versions decorator to declare bundle'
                         ' versions for this test') from e
-        source_directory = find_bundle_directory(TEST_BUNDLES_DIRECTORY, bundle_id, version)
+        TestBundleLoader = None
+        try:
+            source_directory = find_bundle_directory(TEST_BUNDLES_DIRECTORY, bundle_id, version)
+        except BundleNotFound:
+            marker = request.node.get_closest_marker("bundle_remote")
+            test_bundles_remote = marker.args[0] if marker else None
+            if not test_bundles_remote:
+                raise
+            with open(test_bundles_remote) as inp:
+                remote = Remote.read(inp)
+            source_directory = None
+        else:
+            class TestAC(AccessorConfig):
+                def __eq__(self, other):
+                    return other is self
 
-        class TestAC(AccessorConfig):
-            def __eq__(self, other):
-                return other is self
+                def __hash__(self):
+                    return object.__hash__(self)
 
-            def __hash__(self):
-                return object.__hash__(self)
+            class TestBundleLoader(Loader):
+                def __init__(self, ac):
+                    pass
 
-        class TestBundleLoader(Loader):
-            def __init__(self, ac):
-                pass
+                def bundle_versions(self):
+                    return [version]
 
-            def bundle_versions(self):
-                return [version]
+                @classmethod
+                def can_load_from(cls, ac):
+                    if isinstance(ac, TestAC):
+                        return True
+                    return False
 
-            @classmethod
-            def can_load_from(cls, ac):
-                if isinstance(ac, TestAC):
+                def can_load(self, ident, version):
                     return True
-                return False
 
-            def can_load(self, ident, version):
-                return True
-
-            def load(self, ident, version):
-                shutil.copytree(source_directory, self.base_directory)
-        TestBundleLoader.register()
-        remote = Remote(f'test_{request.fixturename}', (TestAC(),))
+                def load(self, ident, version):
+                    shutil.copytree(source_directory, self.base_directory)
+            TestBundleLoader.register()
+            remote = Remote(f'test_{request.fixturename}', (TestAC(),))
 
         yield BundleData(
                 bundle_id,
                 version,
                 source_directory,
                 remote)
+        if TestBundleLoader:
+            TestBundleLoader.unregister()
     return bundle
 
 
@@ -412,3 +425,8 @@ class Data(object):
         return outputs[0] if len(outputs) == 1 else outputs
 
     __repr__ = __str__
+
+
+def pytest_configure(config):
+    config.addinivalue_line('markers',
+            'bundle_remote: Declares a serialized remote to use in testing')
