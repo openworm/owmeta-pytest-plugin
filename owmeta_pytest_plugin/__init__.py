@@ -61,6 +61,8 @@ def bundle_fixture_helper(bundle_id, version=None):
         try:
             source_directory = find_bundle_directory(TEST_BUNDLES_DIRECTORY, bundle_id, version)
         except BundleNotFound:
+            # If there is a Remote defined, try to read it in, either as the file
+            # containing the definition for the Remote...
             marker = request.node.get_closest_marker("bundle_remote")
             test_bundles_remote = marker.args[0] if marker else None
             if not test_bundles_remote:
@@ -69,9 +71,13 @@ def bundle_fixture_helper(bundle_id, version=None):
                 with open(test_bundles_remote) as inp:
                     remote = Remote.read(inp)
             except FileNotFoundError:
+                # ...or, if we do not find a file with that name, as the name of a previously
+                # configured remote in this project's .owm directory
                 remote = retrieve_remote_by_name(p(DEFAULT_OWM_DIR, 'remotes'), test_bundles_remote)
                 if remote is None:
                     raise
+            # Set source_directory to None since it is not really applicable in the case
+            # that the bundle is not maintained statically in the project
             source_directory = None
         else:
             class TestAC(AccessorConfig):
@@ -95,7 +101,7 @@ def bundle_fixture_helper(bundle_id, version=None):
                     return False
 
                 def can_load(self, ident, version):
-                    return True
+                    return ident == bundle_id and version == version
 
                 def load(self, ident, version):
                     shutil.copytree(source_directory, self.base_directory)
