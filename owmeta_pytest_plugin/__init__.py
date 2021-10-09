@@ -57,16 +57,14 @@ def bundle_fixture_helper(bundle_id, version=None):
             except AttributeError as e:
                 raise Exception('Use the bundle_versions decorator to declare bundle'
                         ' versions for this test') from e
-        TestBundleLoader = None
-        try:
-            source_directory = find_bundle_directory(TEST_BUNDLES_DIRECTORY, bundle_id, version)
-        except BundleNotFound:
+
+        remotes = []
+        marker = request.node.get_closest_marker("bundle_remote")
+        remote_defined = False
+        test_bundles_remote = marker.args[0] if marker else None
+        if test_bundles_remote:
             # If there is a Remote defined, try to read it in, either as the file
             # containing the definition for the Remote...
-            marker = request.node.get_closest_marker("bundle_remote")
-            test_bundles_remote = marker.args[0] if marker else None
-            if not test_bundles_remote:
-                raise
             try:
                 with open(test_bundles_remote) as inp:
                     remote = Remote.read(inp)
@@ -74,8 +72,18 @@ def bundle_fixture_helper(bundle_id, version=None):
                 # ...or, if we do not find a file with that name, as the name of a previously
                 # configured remote in this project's .owm directory
                 remote = retrieve_remote_by_name(p(DEFAULT_OWM_DIR, 'remotes'), test_bundles_remote)
-                if remote is None:
-                    raise
+                if remote:
+                    remote_defined = True
+                    remotes.append(remote)
+            else:
+                remote_defined = True
+
+        TestBundleLoader = None
+        try:
+            source_directory = find_bundle_directory(TEST_BUNDLES_DIRECTORY, bundle_id, version)
+        except BundleNotFound:
+            if not remote_defined:
+                raise
             # Set source_directory to None since it is not really applicable in the case
             # that the bundle is not maintained statically in the project
             source_directory = None
@@ -107,12 +115,13 @@ def bundle_fixture_helper(bundle_id, version=None):
                     shutil.copytree(source_directory, self.base_directory)
             TestBundleLoader.register()
             remote = Remote(f'test_{request.fixturename}', (TestAC(),))
+            remotes.append(remote)
 
         yield BundleData(
                 bundle_id,
                 version,
                 source_directory,
-                remote)
+                remotes)
         if TestBundleLoader:
             TestBundleLoader.unregister()
     return bundle
@@ -194,7 +203,7 @@ def _owm_project_helper(request):
 
             def fetch(bundle_data):
                 bundles_directory = p(res.test_homedir, '.owmeta', 'bundles')
-                fetcher = Fetcher(bundles_directory, (bundle_data.remote,))
+                fetcher = Fetcher(bundles_directory, bundle_data.remote)
                 return fetcher.fetch(bundle_data.id, bundle_data.version)
 
             res.owm = owm
