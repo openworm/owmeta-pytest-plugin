@@ -193,12 +193,16 @@ def _owm_project_helper(request):
         try:
             default_context_id = 'http://example.org/data'
             res.sh(f'owm -b init --default-context-id "{default_context_id}"')
+
             res.owmdir = p(res.testdir, DEFAULT_OWM_DIR)
             res.default_context_id = default_context_id
 
-            def owm(**kwargs):
-                r = OWM(owmdir=p(res.testdir, '.owm'), **kwargs)
-                r.userdir = p(res.test_homedir, '.owmeta')
+            def owm(userdir=None, **kwargs):
+                r = OWM(owmdir=res.owmdir, **kwargs)
+                if userdir:
+                    r.userdir = userdir
+                else:
+                    r.userdir = p(res.test_homedir, '.owmeta')
                 return r
 
             def fetch(bundle_data):
