@@ -412,14 +412,14 @@ class Data(object):
                     ----------stdout from "{}"----------
                     {}
                     ----------{}----------
-                    ''').format(cmd, e.output.decode('UTF-8'),
+                    ''').format(cmd.strip(), e.output.decode('UTF-8'),
                                'end stdout'.center(14 + len(cmd))))
                 if getattr(e, 'stderr', None):
                     print(dedent('''\
                     ----------stderr from "{}"----------
                     {}
                     ----------{}----------
-                    ''').format(cmd, e.stderr.decode('UTF-8'),
+                    ''').format(cmd.strip(), e.stderr.decode('UTF-8'),
                                'end stderr'.center(14 + len(cmd))))
                 raise
         return outputs[0] if len(outputs) == 1 else outputs
