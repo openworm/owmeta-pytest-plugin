@@ -198,7 +198,9 @@ def _owm_project_helper(request):
             res.default_context_id = default_context_id
 
             def owm(userdir=None, **kwargs):
-                r = OWM(owmdir=res.owmdir, **kwargs)
+                if 'owmdir' not in kwargs:
+                    kwargs['owmdir'] = res.owmdir
+                r = OWM(**kwargs)
                 if userdir:
                     r.userdir = userdir
                 else:
@@ -271,6 +273,13 @@ def _shell_helper(request, customizations=None):
 
     res.apply_customizations = apply_customizations
     return res
+
+
+@fixture(scope='session', autouse=True)
+def owmeta_ep_cache():
+    with tempfile.TemporaryDirectory(prefix=f'{__name__}.ep_cache.') as tempdir:
+        os.environ['OWMETA_EP_CACHE_LOCATION'] = tempdir
+        yield
 
 
 class Data(object):
