@@ -24,7 +24,7 @@ BundleData = namedtuple('BundleData', ('id', 'version', 'source_directory', 'rem
 TEST_BUNDLES_DIRECTORY = os.environ.get('TEST_BUNDLES_DIRECTORY', 'bundles')
 
 
-def bundle_fixture_helper(bundle_id, version=None):
+def bundle_fixture_helper(id, version=None):
     '''
     Creates test fixtures for testing with pre-made bundles.
 
@@ -32,7 +32,7 @@ def bundle_fixture_helper(bundle_id, version=None):
 
     Parameters
     ----------
-    bundle_id : str
+    id : str
         The ID of the bundle
     version : int, optional
         The version of the bundle
@@ -44,19 +44,24 @@ def bundle_fixture_helper(bundle_id, version=None):
     '''
     def bundle(request):
         # Raises a BundleNotFound exception if the bundle can't be found
-        nonlocal version, bundle_id
-        if bundle_id is None and version is None:
+        nonlocal version, id
+
+        if id is None and version is None:
             try:
-                bundle_id, version = request.param
+                bundle_id, bundle_version = request.param
             except AttributeError as e:
                 raise Exception('Use the bundles decorator to declare bundle'
                         ' versions for this test') from e
         elif version is None:
             try:
-                version = request.param
+                bundle_version = request.param
+                bundle_id = id
             except AttributeError as e:
                 raise Exception('Use the bundle_versions decorator to declare bundle'
                         ' versions for this test') from e
+        else:
+            bundle_id = id
+            bundle_version = version
 
         remotes = []
         marker = request.node.get_closest_marker("bundle_remote")
@@ -80,7 +85,7 @@ def bundle_fixture_helper(bundle_id, version=None):
 
         TestBundleLoader = None
         try:
-            source_directory = find_bundle_directory(TEST_BUNDLES_DIRECTORY, bundle_id, version)
+            source_directory = find_bundle_directory(TEST_BUNDLES_DIRECTORY, bundle_id, bundle_version)
         except BundleNotFound:
             if not remote_defined:
                 raise
@@ -100,7 +105,7 @@ def bundle_fixture_helper(bundle_id, version=None):
                     pass
 
                 def bundle_versions(self):
-                    return [version]
+                    return [bundle_version]
 
                 @classmethod
                 def can_load_from(cls, ac):
@@ -109,7 +114,7 @@ def bundle_fixture_helper(bundle_id, version=None):
                     return False
 
                 def can_load(self, ident, version):
-                    return ident == bundle_id and version == version
+                    return ident == bundle_id and version == bundle_version
 
                 def load(self, ident, version):
                     shutil.copytree(source_directory, self.base_directory)
@@ -119,7 +124,7 @@ def bundle_fixture_helper(bundle_id, version=None):
 
         yield BundleData(
                 bundle_id,
-                version,
+                bundle_version,
                 source_directory,
                 remotes)
         if TestBundleLoader:
