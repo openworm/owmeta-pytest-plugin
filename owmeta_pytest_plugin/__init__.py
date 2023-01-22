@@ -1,12 +1,13 @@
-from contextlib import contextmanager
-from collections import namedtuple
-from subprocess import check_output, CalledProcessError
-from os.path import join as p, exists, split as split_path, isdir, isabs
-from textwrap import dedent
-import tempfile
-import shutil
-import shlex
+import json
 import os
+from os.path import join as p, exists, split as split_path, isdir, isabs
+import shlex
+import shutil
+import tempfile
+from collections import namedtuple
+from contextlib import contextmanager
+from subprocess import check_output, CalledProcessError
+from textwrap import dedent
 
 from owmeta_core.command import OWM
 from owmeta_core.command_util import DEFAULT_OWM_DIR
@@ -20,7 +21,9 @@ from pytest import fixture, mark
 
 __version__ = '0.0.7.dev0'
 
-BundleData = namedtuple('BundleData', ('id', 'version', 'source_directory', 'remote'))
+BundleData = namedtuple('BundleData', ('id', 'version', 'source_directory', 'remote'),
+                        defaults=dict(source_directory=None, remote=None))
+
 TEST_BUNDLES_DIRECTORY = os.environ.get('TEST_BUNDLES_DIRECTORY', 'bundles')
 
 
@@ -79,9 +82,11 @@ def bundle_fixture_helper(id, version=None):
                 remote = retrieve_remote_by_name(p(DEFAULT_OWM_DIR, 'remotes'), test_bundles_remote)
                 if remote:
                     remote_defined = True
-                    remotes.append(remote)
+                else:
+                    raise
             else:
                 remote_defined = True
+            remotes.append(remote)
 
         TestBundleLoader = None
         try:
@@ -213,12 +218,44 @@ def _owm_project_helper(request):
                 return r
 
             def fetch(bundle_data):
+                '''
+                Fetch the bundle described by the given data into the test home directory
+
+                Parameters
+                ----------
+                bundle_data : .BundleData
+                    The bundle description
+                '''
                 bundles_directory = p(res.test_homedir, '.owmeta', 'bundles')
                 fetcher = Fetcher(bundles_directory, bundle_data.remote)
                 return fetcher.fetch(bundle_data.id, bundle_data.version)
 
+            _fetch = fetch
+
+            def add_dependency(bundle_data, fetch=True):
+                '''
+                Add a bundle dependency to the project. By default, this will also fetch
+                the bundle.
+
+                Parameters
+                ----------
+                bundle_data : .BundleData
+                    The bundle description
+                fetch : bool, optional
+                    If `True` fetch the bundle into the project's test directory.
+                    Default is `True`.
+                '''
+                orig_deps = owm().config.get('dependencies')
+                deps = [{'id': bundle_data.id, 'version': bundle_data.version}]
+                if orig_deps is not None:
+                    deps = orig_deps + deps
+                owm().config.set('dependencies', json.dumps(deps))
+                if fetch:
+                    _fetch(bundle_data)
+
             res.owm = owm
             res.fetch = fetch
+            res.add_dependency = add_dependency
 
             yield res
         finally:

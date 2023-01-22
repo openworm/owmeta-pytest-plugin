@@ -4,11 +4,11 @@ from pathlib import Path
 import os
 
 import pytest
-from owmeta_core.bundle import Remote
-from owmeta_core.bundle.common import BUNDLE_MANIFEST_FILE_NAME
+from owmeta_core.bundle import Remote, find_bundle_directory
 from owmeta_core.bundle.loaders.local import FileURLConfig
 
-from owmeta_pytest_plugin import bundles, bundle_versions, bundle_fixture_helper
+from owmeta_pytest_plugin import (bundles, bundle_versions, bundle_fixture_helper,
+                                  BundleData)
 
 
 # Save the CWD since pytester changes it
@@ -37,6 +37,22 @@ def test_owm_project_owmdir(owm_project):
 @bundles([('example/aBundle', 23)])
 def test_owm_project_fetch_bundle(owm_project, bundle):
     bundle_dir = owm_project.fetch(bundle)
+    assert bundle_dir.startswith(owm_project.testdir)
+
+
+def test_owm_project_add_two_deps(owm_project):
+    # add a couple dependencies
+    owm_project.add_dependency(BundleData('aBundle', 3), fetch=False)
+    owm_project.add_dependency(BundleData('anotherBundle', 1), fetch=False)
+    deps = owm_project.owm().config.get('dependencies')
+    assert deps == [{'id': 'aBundle', 'version': 3}, {'id': 'anotherBundle', 'version': 1}]
+
+
+@bundles([('example/aBundle', 23)])
+def test_owm_project_add_dep_and_fetch(owm_project, bundle):
+    owm_project.add_dependency(bundle)
+    bundles_directory = Path(owm_project.test_homedir, '.owmeta', 'bundles')
+    bundle_dir = find_bundle_directory(bundles_directory, bundle.id, bundle.version)
     assert bundle_dir.startswith(owm_project.testdir)
 
 
