@@ -19,7 +19,7 @@ from pkg_resources import resource_stream
 from pytest import fixture, mark
 
 
-__version__ = '0.0.7.dev0'
+__version__ = '0.0.7'
 
 BundleData = namedtuple('BundleData', ('id', 'version', 'source_directory', 'remote'),
                         defaults=dict(source_directory=None, remote=None))
