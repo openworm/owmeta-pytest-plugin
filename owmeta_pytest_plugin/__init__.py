@@ -23,6 +23,9 @@ __version__ = '0.0.7'
 
 BundleData = namedtuple('BundleData', ('id', 'version', 'source_directory', 'remote'),
                         defaults=dict(source_directory=None, remote=None))
+'''
+Returned by the `bundle` fixture
+'''
 
 TEST_BUNDLES_DIRECTORY = os.environ.get('TEST_BUNDLES_DIRECTORY', 'bundles')
 
@@ -47,7 +50,6 @@ def bundle_fixture_helper(id, version=None):
     '''
     def bundle(request):
         # Raises a BundleNotFound exception if the bundle can't be found
-        nonlocal version, id
 
         if id is None and version is None:
             try:
@@ -140,6 +142,11 @@ def bundle_fixture_helper(id, version=None):
 bundle = fixture(bundle_fixture_helper(None))
 '''
 A fixture for bundles.
+
+Essentially, this is just a generic version of the fixtures that `bundle_fixture_helper`
+yields.
+
+Returns a `BundleData`
 '''
 
 
@@ -184,14 +191,11 @@ def owm_project_with_customizations(request):
 def owm_project(request):
     '''
     Returns a `shell_helper` fixture but with a .owm project directory in the test
-    directory. The helper also gets new methods:
+    directory. The helper also gets new methods which you can find under `OWMProject`.
 
-    ``owm(**kwargs)``: Creates and returns an `~owmeta_core.command.OWM` with its
-    `~owmeta_core.command.OWM.owmdir` at the test .owm directory
-
-    ``fetch(bundle_data)``: Fetches a bundle into the test home directory. `bundle_data`
-    likely comes from a test fixture created with `bundle_fixture_helper`
-
+    See Also
+    --------
+    OWMProject
     '''
     with contextmanager(_owm_project_helper(request))() as f:
         yield f
@@ -199,63 +203,13 @@ def owm_project(request):
 
 def _owm_project_helper(request):
     def f(*args, **kwargs):
-        res = _shell_helper(request, *args, **kwargs)
+        res = _shell_helper(request, *args, cls=OWMProject, **kwargs)
         try:
             default_context_id = 'http://example.org/data'
             res.sh(f'owm -b init --default-context-id "{default_context_id}"')
 
             res.owmdir = p(res.testdir, DEFAULT_OWM_DIR)
             res.default_context_id = default_context_id
-
-            def owm(userdir=None, **kwargs):
-                if 'owmdir' not in kwargs:
-                    kwargs['owmdir'] = res.owmdir
-                r = OWM(**kwargs)
-                if userdir:
-                    r.userdir = userdir
-                else:
-                    r.userdir = p(res.test_homedir, '.owmeta')
-                return r
-
-            def fetch(bundle_data):
-                '''
-                Fetch the bundle described by the given data into the test home directory
-
-                Parameters
-                ----------
-                bundle_data : .BundleData
-                    The bundle description
-                '''
-                bundles_directory = p(res.test_homedir, '.owmeta', 'bundles')
-                fetcher = Fetcher(bundles_directory, bundle_data.remote)
-                return fetcher.fetch(bundle_data.id, bundle_data.version)
-
-            _fetch = fetch
-
-            def add_dependency(bundle_data, fetch=True):
-                '''
-                Add a bundle dependency to the project. By default, this will also fetch
-                the bundle.
-
-                Parameters
-                ----------
-                bundle_data : .BundleData
-                    The bundle description
-                fetch : bool, optional
-                    If `True` fetch the bundle into the project's test directory.
-                    Default is `True`.
-                '''
-                orig_deps = owm().config.get('dependencies')
-                deps = [{'id': bundle_data.id, 'version': bundle_data.version}]
-                if orig_deps is not None:
-                    deps = orig_deps + deps
-                owm().config.set('dependencies', json.dumps(deps))
-                if fetch:
-                    _fetch(bundle_data)
-
-            res.owm = owm
-            res.fetch = fetch
-            res.add_dependency = add_dependency
 
             yield res
         finally:
@@ -293,15 +247,17 @@ def shell_helper_with_customizations(request):
     return f
 
 
-def _shell_helper(request, customizations=None):
-    res = Data()
+def _shell_helper(request, customizations=None, cls=None):
+    if cls is None:
+        cls = Data
+    res = cls()
     os.mkdir(res.test_homedir)
 
     # Am I *supposed* to use _cov to detect pytest-cov installation? Maybe... maybe
     # not....
     pm = request.config.pluginmanager
     if pm.hasplugin('_cov'):
-        with resource_stream('owmeta_pytest_plugin', 'pytest-cov-embed.py') as f:
+        with resource_stream('owmeta_pytest_plugin', 'pytest_cov_embed.py') as f:
             ptcov = f.read()
         # Added so pytest_cov gets to run for our subprocesses
         with open(p(res.testdir, 'sitecustomize.py'), 'wb') as f:
@@ -476,6 +432,70 @@ class Data(object):
         return outputs[0] if len(outputs) == 1 else outputs
 
     __repr__ = __str__
+
+
+class OWMProject(Data):
+    '''
+    Returned by `owm_project` and `owm_project_with_customizations`
+    '''
+
+    def owm(self, userdir=None, **kwargs):
+        '''
+        Creates and returns an `~owmeta_core.command.OWM` with its
+        `~owmeta_core.command.OWM.owmdir` at the test .owm directory
+
+        Parameters
+        ----------
+        userdir : str or pathlib.Path, optional
+            Root directory for user-specific configs. For reproducibility, it's best to
+            use a temporary directory. The default is a ".owmeta" directory under
+            `test_homedir`
+        '''
+        if 'owmdir' not in kwargs:
+            kwargs['owmdir'] = self.owmdir
+        r = OWM(**kwargs)
+        if userdir:
+            r.userdir = userdir
+        else:
+            r.userdir = p(self.test_homedir, '.owmeta')
+        return r
+
+    def fetch(self, bundle_data):
+        '''
+        Fetch the bundle described by the given data into the test home directory.
+
+        `bundle_data` typically comes from a test fixture created with
+        `bundle_fixture_helper`
+
+        Parameters
+        ----------
+        bundle_data : .BundleData
+            The bundle description
+        '''
+        bundles_directory = p(self.test_homedir, '.owmeta', 'bundles')
+        fetcher = Fetcher(bundles_directory, bundle_data.remote)
+        return fetcher.fetch(bundle_data.id, bundle_data.version)
+
+    def add_dependency(self, bundle_data, fetch=True):
+        '''
+        Add a bundle dependency to the project. By default, this will also fetch
+        the bundle.
+
+        Parameters
+        ----------
+        bundle_data : .BundleData
+            The bundle description
+        fetch : bool, optional
+            If `True` fetch the bundle into the project's test directory.
+            Default is `True`.
+        '''
+        orig_deps = self.owm().config.get('dependencies')
+        deps = [{'id': bundle_data.id, 'version': bundle_data.version}]
+        if orig_deps is not None:
+            deps = orig_deps + deps
+        self.owm().config.set('dependencies', json.dumps(deps))
+        if fetch:
+            self.fetch(bundle_data)
 
 
 def pytest_configure(config):
