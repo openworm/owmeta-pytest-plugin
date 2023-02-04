@@ -458,6 +458,7 @@ class OWMProject(Data):
             r.userdir = userdir
         else:
             r.userdir = p(self.test_homedir, '.owmeta')
+        r.basedir = self.testdir
         return r
 
     def fetch(self, bundle_data):
